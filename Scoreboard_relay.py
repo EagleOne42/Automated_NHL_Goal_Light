@@ -21,7 +21,7 @@ i = datetime.datetime.now()  # date and time formatting http://www.cyberciti.biz
 
 GPIO.setmode(GPIO.BOARD) #This refers to the pin numbers on the P1 header of the Raspberry Pi board.
 
-chan_list = [7,11,13,15,16]
+chan_list = [7]
 GPIO.setup(chan_list, GPIO.OUT)
 
 refresh_time = 21600  # 6 hours Refresh time (seconds), NHL API refresh is every 60 seconds
@@ -48,9 +48,16 @@ def main():
 	global away_old_score
 	clear_screen()
 	
-	print "Testing Lights"
-	lgb_leds()
-
+	print 'Running goal tests...'
+	print 'Test 1'
+	activate_goal_light()
+	print 'Test 1 complete - sleep for 5'
+	time.sleep(5)
+	print 'Test 2'
+	activate_goal_light()
+	print 'Test 2 complete'
+	
+	
 	# Format dates to match NHL API style:
 	
 	# Todays date
@@ -119,10 +126,6 @@ def main():
 						away_team_name = fix_name(away_team_name)
 						home_team_name = fix_name(home_team_name)
 						
-						
-						
-						
-						
 						# Show games from Yesterday and today or just today
 						if (yesterdays_date in game_clock.title() and not show_today_only) or todays_date in game_clock.title() or 'TODAY' in game_clock or 'LIVE' in status:
 						
@@ -137,9 +140,6 @@ def main():
 								elif todays_date in game_clock.title() or 'TODAY' in game_clock:
 									header_text += '\nTODAY '
 								header_text += '(' + status + ')'
-							
-							
-							
 							
 							# Upcoming game, ex: TUESDAY 4/21, 7:00 PM EST)
 							elif 'DAY' in game_clock:
@@ -157,22 +157,16 @@ def main():
 							
 							print(header_text)
 							
-							
-							
-							
-							
 							# Highlight the winner of finished games in green, and games underway in blue:
 							# Away team wins
 							if away_team_result == 'winner':
 								print(Style.BRIGHT + Fore.GREEN + away_team_name + ': ' + away_team_score + Style.RESET_ALL)
 								print(home_team_name + ': ' + home_team_score)
 							
-							
 							# Home team wins
 							elif home_team_result == 'winner':
 								print(away_team_name + ': ' + away_team_score)
 								print(Style.BRIGHT + Fore.GREEN + home_team_name + ': ' + home_team_score + Style.RESET_ALL)
-							
 							
 							# Game still underway
 							elif 'progress' in game_stage or 'critical' in game_stage:
@@ -181,7 +175,6 @@ def main():
 								game_home(home_team_name,home_team_score,game_clock,status) 
 								game_away(away_team_name,away_team_score,game_clock,status)
 							
-															
 							# Game hasn't yet started
 							else:
 								print(away_team_name + ': ' + away_team_score)
@@ -199,12 +192,6 @@ def main():
 								print "Team playing: " + str(team_playing)
 								print ""
 
-							
-							
-							
-							
-							
-			
 			if team_playing == False:
 				print ("Current time: " + str(datetime.datetime.now()))
 				refresh_time = 21600 # 6 hours
@@ -212,7 +199,6 @@ def main():
 			# Perfrom the refresh
 			time.sleep(refresh_time)
 
-			
 			
 def clear_screen():
 	if platform.system() == 'Windows':
@@ -284,8 +270,7 @@ def game_away(away_team_name, away_team_score, game_clock, status):
 			
 			if int(away_old_score) < int(away_team_score): # If the old score < the new score, a goal was scored
 				print team + " have scored a goal!"
-				flash_leds()
-				beacon_leds()
+				activate_goal_light()
 				away_old_score = int(away_team_score) # Set the old_score to be the current score
 				print "Away old_score: " + str(away_old_score)
 				
@@ -294,10 +279,6 @@ def game_away(away_team_name, away_team_score, game_clock, status):
 		away_old_score = 0
 		print "Away old_score: " + str(away_old_score)
 		print "Not " + team + " gameday!! Refresh in: " + str(refresh_time) + " seconds (6 hours)"
-
-
-
-
 
 
 def game_home(home_team_name, home_team_score, game_clock, status):
@@ -346,11 +327,9 @@ def game_home(home_team_name, home_team_score, game_clock, status):
 			print "Refresh time: " + str(refresh_time) + " seconds"
 			print "Home old_score: " + str(old_score)
 			
-			
 			if int(old_score) < int(home_team_score): # If the old score < the new score, a goal was scored
 				print team + " have scored a goal!"
-				flash_leds()
-				beacon_leds()
+				activate_goal_light()
 				old_score = int(home_team_score) # Set the old_score to be the current score
 				print "Home old_score: " + str(old_score)
 				
@@ -375,53 +354,63 @@ def fix_name(team_name):
 	return team_name
 
 
-def beacon_leds():
-	for i in range(0, 40):
-		GPIO.output(7, True)
-		time.sleep(0.1)
-		GPIO.output(7, False)
-		GPIO.output(11, True)
-		time.sleep(0.1)
-		GPIO.output(11, False)
-		GPIO.output(15, True)
-		time.sleep(0.1)
-		GPIO.output(15, False)
-		GPIO.output(16, True)
-		time.sleep(0.1)
-		GPIO.output(16, False)
-		GPIO.output(13, True)
-		time.sleep(0.1)
-		GPIO.output(13, False)
-
-
-def flash_leds():
-	for i in range(0, 20):
-		GPIO.output(chan_list True)		
-		time.sleep(0.1)
-		GPIO.output(chan_list False)		
-		time.sleep(0.1)
-
-
-def lgb_leds():
-	print "LETS!"
-	GPIO.output(chan_list True)		
-	time.sleep(0.5)
-	GPIO.output(chan_list False)		
-	time.sleep(0.5)
-
-	print "GO!"
-	GPIO.output(chan_list True)		
-	time.sleep(0.5)
-	GPIO.output(chan_list False)		
-	time.sleep(0.5)
-
-	print "BLUES!!!" 
-	GPIO.output(chan_list True)		
-	time.sleep(1)
-	GPIO.output(chan_list False)		
-	print "Done - all off"
-	time.sleep(1)
+def setup_light():
+	GPIO.output(7, True)
+	print "1) Steady On"
+	print "2) 3 Flashes - 1, then 2"
+	print "3) 1 Flash"
+	print "4) Rotating Beacon (Goal Light)"
+	print ''
+	starting_mode = int(input("Enter 1-4 for the current mode "))
+	print 'You entered:', starting_mode
+	GPIO.output(7, False)
+	time.sleep(0.25)
 	
+	if starting_mode == 1:
+		for i in range(0, 2):
+			cycle_light()
+		print 'Light ready'
+	elif starting_mode == 2:
+		for i in range(1, 2):
+			cycle_light()
+		print 'Light ready'
+	elif starting_mode == 3:
+		GPIO.output(7, False)
+		time.sleep(0.25)
+		print 'Light ready'
+	elif starting_mode == 4:
+		print 'Testing Reset Light'
+		reset_light()
+		print 'Light ready'
+		
+	print 'TEST GOAL!!! - The light should be in beacon(rotating) mode - if not, restart this script'
+	GPIO.output(7, True)
+	time.sleep(10)
+	GPIO.output(7, False)
+	time.sleep(0.25)
+	reset_light()
+
+
+def reset_light():
+	for i in range(0, 3):
+		cycle_light()
+		
+
+def cycle_light():
+	GPIO.output(7, True)
+	time.sleep(0.25)
+	GPIO.output(7, False)
+	time.sleep(0.25)
+
+	
+def activate_goal_light():
+	print 'Activating Goal light'
+	GPIO.output(7, True)
+	time.sleep(10)
+	GPIO.output(7, False)
+	time.sleep(0.25)
+	reset_light()
+
 
 def parse_arguments(arguments):
 	global show_today_only
@@ -442,7 +431,10 @@ if __name__ == '__main__':
 
 		# Parse any arguments provided
 		parse_arguments(sys.argv)
-
+		
+		# Run the setup light
+		setup_light()
+		
 		# Start the main loop
 		main()
 

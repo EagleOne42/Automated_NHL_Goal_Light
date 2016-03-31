@@ -1,4 +1,4 @@
-team = 'Blues' # Select the team you want
+team = 'Jets' # Select the team you want
 # Avalanche, Blackhawks, Blue Jackets, Blues, Bruins, Canadiens, Canucks, Capitals, Coyotes, Devils, Ducks, Flames, Flyers, Hurricanes, Islanders, Jets, Kings, Lightning, Maple Leafs ,Oilers, Panthers, Penguins, Predators, Red Wings, Sabres, Senators, Sharks, Stars, Wild
 
 
@@ -10,19 +10,13 @@ import platform
 import sys
 import time
 import requests
+import RPi.GPIO as GPIO
 import socket 
-try:
-	import RPi.GPIO as GPIO
-except RuntimeError:
-	print ("Error importing RPi.GPIO!  This is probably because you need superuser privileges.  You can achieve this by using 'sudo' to run your script")
-
 
 i = datetime.datetime.now()  # date and time formatting http://www.cyberciti.biz/faq/howto-get-current-date-time-in-python/
 
-GPIO.setmode(GPIO.BOARD) #This refers to the pin numbers on the P1 header of the Raspberry Pi board.
-
-chan_list = [7,11,13,15,16]
-GPIO.setup(chan_list, GPIO.OUT)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(7, GPIO.OUT) #Set the Raspberry Pi GPIO pin 7 as output
 
 refresh_time = 21600  # 6 hours Refresh time (seconds), NHL API refresh is every 60 seconds
 api_url = 'http://live.nhle.com/GameData/RegularSeasonScoreboardv3.jsonp?loadScoreboard=jQuery110105207217424176633_1428694268811&_=1428694268812'
@@ -48,9 +42,6 @@ def main():
 	global away_old_score
 	clear_screen()
 	
-	print "Testing Lights"
-	lgb_leds()
-
 	# Format dates to match NHL API style:
 	
 	# Todays date
@@ -239,6 +230,8 @@ def fix_locale(team_locale):
 	return team_locale
 
 
+
+
 def game_away(away_team_name, away_team_score, game_clock, status):
 	global refresh_time
 	global away_old_score
@@ -284,8 +277,9 @@ def game_away(away_team_name, away_team_score, game_clock, status):
 			
 			if int(away_old_score) < int(away_team_score): # If the old score < the new score, a goal was scored
 				print team + " have scored a goal!"
-				flash_leds()
-				beacon_leds()
+				GPIO.output(7, True) # Activate the light
+				time.sleep(1)
+				GPIO.output(7, False) # Turn the rPI pin off so we can use it again
 				away_old_score = int(away_team_score) # Set the old_score to be the current score
 				print "Away old_score: " + str(away_old_score)
 				
@@ -349,8 +343,9 @@ def game_home(home_team_name, home_team_score, game_clock, status):
 			
 			if int(old_score) < int(home_team_score): # If the old score < the new score, a goal was scored
 				print team + " have scored a goal!"
-				flash_leds()
-				beacon_leds()
+				GPIO.output(7, True) # Activate the light
+				time.sleep(1)
+				GPIO.output(7, False) # Turn the rPI pin off so we can use it again
 				old_score = int(home_team_score) # Set the old_score to be the current score
 				print "Home old_score: " + str(old_score)
 				
@@ -359,6 +354,10 @@ def game_home(home_team_name, home_team_score, game_clock, status):
 		old_score = 0
 		print "Home old_score: " + str(old_score)
 		print "Not " + team + " gameday!! Refresh in: " + str(refresh_time) + " seconds (6 hours)"
+
+
+
+
 
 
 def fix_name(team_name):
@@ -375,53 +374,6 @@ def fix_name(team_name):
 	return team_name
 
 
-def beacon_leds():
-	for i in range(0, 40):
-		GPIO.output(7, True)
-		time.sleep(0.1)
-		GPIO.output(7, False)
-		GPIO.output(11, True)
-		time.sleep(0.1)
-		GPIO.output(11, False)
-		GPIO.output(15, True)
-		time.sleep(0.1)
-		GPIO.output(15, False)
-		GPIO.output(16, True)
-		time.sleep(0.1)
-		GPIO.output(16, False)
-		GPIO.output(13, True)
-		time.sleep(0.1)
-		GPIO.output(13, False)
-
-
-def flash_leds():
-	for i in range(0, 20):
-		GPIO.output(chan_list True)		
-		time.sleep(0.1)
-		GPIO.output(chan_list False)		
-		time.sleep(0.1)
-
-
-def lgb_leds():
-	print "LETS!"
-	GPIO.output(chan_list True)		
-	time.sleep(0.5)
-	GPIO.output(chan_list False)		
-	time.sleep(0.5)
-
-	print "GO!"
-	GPIO.output(chan_list True)		
-	time.sleep(0.5)
-	GPIO.output(chan_list False)		
-	time.sleep(0.5)
-
-	print "BLUES!!!" 
-	GPIO.output(chan_list True)		
-	time.sleep(1)
-	GPIO.output(chan_list False)		
-	print "Done - all off"
-	time.sleep(1)
-	
 
 def parse_arguments(arguments):
 	global show_today_only
@@ -435,21 +387,14 @@ def parse_arguments(arguments):
 			show_today_only = True
 
 
+
+
 if __name__ == '__main__':
-	try:
-		# Initialize Colorama
-		init()
+    # Initialize Colorama
+    init()
 
-		# Parse any arguments provided
-		parse_arguments(sys.argv)
+    # Parse any arguments provided
+    parse_arguments(sys.argv)
 
-		# Start the main loop
-		main()
-
-	except KeyboardInterrupt:
-		print 'Keyboard Interrupt'
-
-	finally:
-		print "Running GPIO Cleanup"
-		GPIO.cleanup() # this ensures a clean exit
-
+    # Start the main loop
+    main()

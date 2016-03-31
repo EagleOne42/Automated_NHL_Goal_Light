@@ -1,6 +1,6 @@
-team = 'Blues' # Select the team you want
-# Avalanche, Blackhawks, Blue Jackets, Blues, Bruins, Canadiens, Canucks, Capitals, Coyotes, Devils, Ducks, Flames, Flyers, Hurricanes, Islanders, Jets, Kings, Lightning, Maple Leafs ,Oilers, Panthers, Penguins, Predators, Red Wings, Sabres, Senators, Sharks, Stars, Wild
+team = 'Blues' # Select the team you want normally
 
+team_list = ('Avalanche', 'Blackhawks', 'Blue Jackets', 'Blues', 'Bruins', 'Canadiens', 'Canucks', 'Capitals', 'Coyotes', 'Devils', 'Ducks', 'Flames', 'Flyers', 'Hurricanes', 'Islanders', 'Jets', 'Kings', 'Lightning', 'Maple Leafs', 'Oilers', 'Panthers', 'Penguins', 'Predators', 'Rangers', 'Red Wings', 'Sabres', 'Senators', 'Sharks', 'Stars', 'Wild')
 
 from colorama import init, Fore, Style
 import datetime
@@ -21,22 +21,20 @@ i = datetime.datetime.now()  # date and time formatting http://www.cyberciti.biz
 
 GPIO.setmode(GPIO.BOARD) #This refers to the pin numbers on the P1 header of the Raspberry Pi board.
 
-chan_list = [7,11,13,15,16]
-GPIO.setup(chan_list, GPIO.OUT)
+goal_light_gpio_pins = [7]  #Using pin 7 to activate the relay, can add pins here for additional lights
+GPIO.setup(goal_light_gpio_pins, GPIO.OUT)
 
 refresh_time = 21600  # 6 hours Refresh time (seconds), NHL API refresh is every 60 seconds
-api_url = 'http://live.nhle.com/GameData/RegularSeasonScoreboardv3.jsonp?loadScoreboard=jQuery110105207217424176633_1428694268811&_=1428694268812'
+api_url = 'http://live.nhle.com/GameData/RegularSeasonScoreboardv3.jsonp'
+game_api_url = 'http://live.nhle.com/GameData/20152016/2015021099/gc/gcsb.jsonp'
 api_headers = {'Host': 'live.nhle.com', 'User-Agent': 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.118 Safari/537.36', 'Referer': 'http://www.nhl.com/ice/scores.htm'}
 
 #Home team variables
 old_score = 0
-
 team_playing = False
 
 #Away team variables
 away_old_score = 0
-
-
 show_today_only = False
 
 
@@ -48,9 +46,16 @@ def main():
 	global away_old_score
 	clear_screen()
 	
-	print "Testing Lights"
-	lgb_leds()
-
+	print 'Running goal tests...'
+	print 'Test 1'
+	activate_goal_light()
+	print 'Test 1 complete - sleep for 5'
+	time.sleep(5)
+	print 'Test 2'
+	activate_goal_light()
+	print 'Test 2 complete'
+	
+	
 	# Format dates to match NHL API style:
 	
 	# Todays date
@@ -82,6 +87,25 @@ def main():
 				print ("Unknown error. Please restart the program. ")
 				sys.exit(0)
 			
+			try:
+				q = requests.get(game_api_url, headers=api_headers) #making sure there is a connection with the API
+			except (requests.ConnectionError): #Catch these errors
+				print ("Could not get response from NHL.com trying again...")
+				time.sleep(5)
+				continue
+			except(requests.HTTPError):
+				print ("HTTP Error when loading url. Please restart program. ")
+				sys.exit(0)
+			except(requests.Timeout):
+				print ("The request took too long to process and timed out. Trying again... ")
+				time.sleep(5)
+			except(socket.error):
+				print ("Could not get response from NHL.com trying again...")
+				time.sleep(5)
+			except(requests.RequestException):
+				print ("Unknown error. Please restart the program. ")
+				sys.exit(0)
+
 			
 			# We get back JSON data with some JS around it, gotta remove the JS
 			json_data = r.text
@@ -98,6 +122,7 @@ def main():
 					for game_info in data[key]:
 					
 						# Assign more meaningful names
+						game_id = game_info['id']
 						game_clock = game_info['ts']
 						game_stage = game_info['tsc']
 						status = game_info['bs']
@@ -119,10 +144,6 @@ def main():
 						away_team_name = fix_name(away_team_name)
 						home_team_name = fix_name(home_team_name)
 						
-						
-						
-						
-						
 						# Show games from Yesterday and today or just today
 						if (yesterdays_date in game_clock.title() and not show_today_only) or todays_date in game_clock.title() or 'TODAY' in game_clock or 'LIVE' in status:
 						
@@ -137,9 +158,6 @@ def main():
 								elif todays_date in game_clock.title() or 'TODAY' in game_clock:
 									header_text += '\nTODAY '
 								header_text += '(' + status + ')'
-							
-							
-							
 							
 							# Upcoming game, ex: TUESDAY 4/21, 7:00 PM EST)
 							elif 'DAY' in game_clock:
@@ -157,22 +175,16 @@ def main():
 							
 							print(header_text)
 							
-							
-							
-							
-							
 							# Highlight the winner of finished games in green, and games underway in blue:
 							# Away team wins
 							if away_team_result == 'winner':
 								print(Style.BRIGHT + Fore.GREEN + away_team_name + ': ' + away_team_score + Style.RESET_ALL)
 								print(home_team_name + ': ' + home_team_score)
 							
-							
 							# Home team wins
 							elif home_team_result == 'winner':
 								print(away_team_name + ': ' + away_team_score)
 								print(Style.BRIGHT + Fore.GREEN + home_team_name + ': ' + home_team_score + Style.RESET_ALL)
-							
 							
 							# Game still underway
 							elif 'progress' in game_stage or 'critical' in game_stage:
@@ -181,7 +193,6 @@ def main():
 								game_home(home_team_name,home_team_score,game_clock,status) 
 								game_away(away_team_name,away_team_score,game_clock,status)
 							
-															
 							# Game hasn't yet started
 							else:
 								print(away_team_name + ': ' + away_team_score)
@@ -199,12 +210,6 @@ def main():
 								print "Team playing: " + str(team_playing)
 								print ""
 
-							
-							
-							
-							
-							
-			
 			if team_playing == False:
 				print ("Current time: " + str(datetime.datetime.now()))
 				refresh_time = 21600 # 6 hours
@@ -212,7 +217,6 @@ def main():
 			# Perfrom the refresh
 			time.sleep(refresh_time)
 
-			
 			
 def clear_screen():
 	if platform.system() == 'Windows':
@@ -264,7 +268,7 @@ def game_away(away_team_name, away_team_score, game_clock, status):
 		
 		
 		elif (game_date == "TODAY"): #Game time is near
-			refresh_time = 3600 # 1 hours
+			refresh_time = 900 # 1 hours now 15 min
 			print "It is game day!"
 			print "Refresh time is : " + str(refresh_time) + " seconds (1 hour)"
 		
@@ -284,8 +288,7 @@ def game_away(away_team_name, away_team_score, game_clock, status):
 			
 			if int(away_old_score) < int(away_team_score): # If the old score < the new score, a goal was scored
 				print team + " have scored a goal!"
-				flash_leds()
-				beacon_leds()
+				activate_goal_light()
 				away_old_score = int(away_team_score) # Set the old_score to be the current score
 				print "Away old_score: " + str(away_old_score)
 				
@@ -294,10 +297,6 @@ def game_away(away_team_name, away_team_score, game_clock, status):
 		away_old_score = 0
 		print "Away old_score: " + str(away_old_score)
 		print "Not " + team + " gameday!! Refresh in: " + str(refresh_time) + " seconds (6 hours)"
-
-
-
-
 
 
 def game_home(home_team_name, home_team_score, game_clock, status):
@@ -346,11 +345,9 @@ def game_home(home_team_name, home_team_score, game_clock, status):
 			print "Refresh time: " + str(refresh_time) + " seconds"
 			print "Home old_score: " + str(old_score)
 			
-			
 			if int(old_score) < int(home_team_score): # If the old score < the new score, a goal was scored
 				print team + " have scored a goal!"
-				flash_leds()
-				beacon_leds()
+				activate_goal_light()
 				old_score = int(home_team_score) # Set the old_score to be the current score
 				print "Home old_score: " + str(old_score)
 				
@@ -375,64 +372,89 @@ def fix_name(team_name):
 	return team_name
 
 
-def beacon_leds():
-	for i in range(0, 40):
-		GPIO.output(7, True)
-		time.sleep(0.1)
-		GPIO.output(7, False)
-		GPIO.output(11, True)
-		time.sleep(0.1)
-		GPIO.output(11, False)
-		GPIO.output(15, True)
-		time.sleep(0.1)
-		GPIO.output(15, False)
-		GPIO.output(16, True)
-		time.sleep(0.1)
-		GPIO.output(16, False)
-		GPIO.output(13, True)
-		time.sleep(0.1)
-		GPIO.output(13, False)
-
-
-def flash_leds():
-	for i in range(0, 20):
-		GPIO.output(chan_list True)		
-		time.sleep(0.1)
-		GPIO.output(chan_list False)		
-		time.sleep(0.1)
-
-
-def lgb_leds():
-	print "LETS!"
-	GPIO.output(chan_list True)		
-	time.sleep(0.5)
-	GPIO.output(chan_list False)		
-	time.sleep(0.5)
-
-	print "GO!"
-	GPIO.output(chan_list True)		
-	time.sleep(0.5)
-	GPIO.output(chan_list False)		
-	time.sleep(0.5)
-
-	print "BLUES!!!" 
-	GPIO.output(chan_list True)		
-	time.sleep(1)
-	GPIO.output(chan_list False)		
-	print "Done - all off"
-	time.sleep(1)
+def setup_light():
+	light_on()
+	print "1) Steady On"
+	print "2) 3 Flashes - 1, then 2"
+	print "3) 1 Flash"
+	print "4) Rotating Beacon (Goal Light)"
+	print ''
+	starting_mode = int(input("Enter 1-4 for the current mode "))
+	print 'You entered:', starting_mode
+	light_off()
 	
-
-def parse_arguments(arguments):
-	global show_today_only
-	for x in range(1, len(arguments)):
-		argument = arguments[x]
+	if starting_mode == 1:
+		for i in range(0, 2):
+			cycle_light()
+		print 'Light ready'
+	elif starting_mode == 2:
+		for i in range(1, 2):
+			cycle_light()
+		print 'Light ready'
+	elif starting_mode == 3:
+		light_off()
+		print 'Light ready'
+	elif starting_mode == 4:
+		print 'Testing Reset Light'
+		reset_light()
+		print 'Light ready'
 		
-		if argument == '--help' or argument == '-h':
+	print 'TEST GOAL LIGHT!!! - The light should be in beacon (rotating) mode - if not, restart this script'
+	light_on()
+	time.sleep(10)
+	light_off()
+	reset_light()
+
+
+def reset_light():
+	for i in range(0, 3):
+		cycle_light()
+
+def light_on():
+	GPIO.output(goal_light_gpio_pins, True)
+	time.sleep(0.25)
+
+
+def light_off():
+	GPIO.output(goal_light_gpio_pins, False)
+	time.sleep(0.25)
+		
+
+def cycle_light():
+	light_on()
+	light_off()
+
+	
+def activate_goal_light():
+	print 'Activating Goal light'
+	light_on()
+	time.sleep(10) #Leave light on for 10 secs - GOAL!!!
+	light_off()
+	reset_light()
+
+
+def set_arguments(argv):
+	try:                                
+        	opts, args = getopt.getopt(argv, "ht:d", ["help", "team=", "today-only"])
+    	except getopt.GetoptError:          
+		print 'Error'                         
+        	sys.exit(2)                     
+	for opt, arg in opts:                
+        	if opt in ("-h", "--help"):      
+			print 'Help'
 			print_help()
-			sys.exit(0)
-		elif argument == '--today-only':
+        		sys.exit()                  
+        	elif opt in ("-d", "--today-only"):
+			global show_today_only
 			show_today_only = True
+        	elif opt in ("-t", "--team"):
+			global team
+			if arg in team_list:
+				team = arg
+			else:
+				print 'Team name not in list.  Make sure to use single quote around name.'
+				print 'List of teams: %s' % (team_list,)
+				sys.exit()			
 
 
 if __name__ == '__main__':
@@ -441,8 +463,11 @@ if __name__ == '__main__':
 		init()
 
 		# Parse any arguments provided
-		parse_arguments(sys.argv)
-
+		set_arguments(sys.argv[1:])
+		
+		# Run the setup light
+		setup_light()
+		
 		# Start the main loop
 		main()
 
